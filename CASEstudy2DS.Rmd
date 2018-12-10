@@ -1,0 +1,181 @@
+---
+title: "CASEstudy2DS"
+author: "Solange GarciadeAlford"
+date: "December 1, 2018"
+output: 
+  html_document:
+    keep_md: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Data Science - Case Study 2
+
+##Executive Summary
+
+##Talent management is at the forefront of CDF’s business strategy.  One of the most valuable assets at CDF are the Employees that form the company.  
+
+##CDF’s decision to analyze the company’s attrition is to ensure CDF continues to maintain its place as the leader in the industry.  Each one of CDF’s Employees is key to the success of the enterprise and to gain a competitive edge over its competition.
+
+##DDSAnalytics was engaged by CDF to provide business intelligence to help retain its employees.  
+
+##This analysis covers:
+##   Attrition Trends
+##   Top factors that contribute to CDF’s employee turnover
+##   Attrition Prediction Model
+
+
+```{r}
+
+
+options(repos="https://cran.rstudio.com" )
+install.packages("caret", dependencies = TRUE)
+library(caret)
+
+install.packages("class::knn")
+library(mlr)
+
+library(class)
+require(class)
+install.packages("fpp")
+library(fpp2)
+install.packages("dygraphs")
+library(dygraphs)
+library(xts)
+library(lubridate)
+
+library(RColorBrewer)
+##display.brewer.all()
+cols<-brewer.pal(n=4,name="Set1")
+
+## IMPORT DATA
+## training data set 
+trainingdata <- read.csv("C:/Users/solan/CaseStudy2-data.csv")
+## Validation set 
+testdata <- read.csv("C:/Users/solan/CaseStudy2Validation.csv")
+
+
+## Pull Attrition data into new data frame
+atty <- data.frame(trainingdata[1:1170,c(1,2,3,25,26,27,29,30,31,32,33,34,35,36)])
+attyfinal <- atty[!(atty$Attrition == "No"),]
+
+
+
+
+## Pull of Current employee data into new data frame
+attn <- data.frame(trainingdata[1:1170,c(1,2,3,25,26,27,29,30,31,32,33,34,35,36)])
+attnfinal <- attn[!(attn$Attrition == "Yes"),]
+
+
+
+## Encoding of response variable since the response variable is a categorical variable
+trainingdata = within(trainingdata, {
+    Attrition1 = ifelse(Attrition == 'Yes', 1, 0)   
+})
+testdata = within(testdata, {
+    Attrition1 = ifelse(Attrition == 'No', 1, 0)
+})
+
+
+### Encoding of explanatory variables
+
+## Encoding Gender
+trainingdata = within(trainingdata, {
+    gender1 = ifelse(Gender == 'Female', 1, 0)   
+})
+testdata = within(testdata, {
+    gender1 = ifelse(Gender == 'Female', 1, 0)
+})
+## Encoding Department
+trainingdata$Department1[trainingdata$Department == 'Human Resources'] <- 1
+trainingdata$Department1[trainingdata$Department == 'Research & Development']<- 2
+trainingdata$Department1[trainingdata$Department == 'Sales'] <- 3
+
+testdata$Department1[testdata$Department == 'Human Resources'] <- 1
+testdata$Department1[testdata$Department == 'Research & Development']<- 2
+testdata$Department1[testdata$Department == 'Sales'] <- 3
+
+
+## Trends - Scatter Plots
+
+plot(attnfinal$ID, attnfinal$YearsAtCompany, main="  Current Employees - Years at the Company", 
+  	xlab="Employee", ylab="Employee's Years At Company", pch=20, col="Green")
+
+
+plot(attnfinal$ID, attnfinal$Age, main="  Current Employees by Age", 
+  	xlab="Employee by ID ", ylab="Curren Employees by Age", pch=20, col="orange")
+
+
+plot(attyfinal$TotalWorkingYears, main="  Attrition - Total Working Years", 
+  	xlab="Employees", ylab="Employee's Years At Company", pch=20, col="blue")
+
+
+## Fitting model on the trainingset
+Model1_fit = lm(Attrition1 ~ Age + YearsAtCompany + YearsSinceLastPromotion + MonthlyIncome + Department1, data=trainingdata)
+summary(Model1_fit)
+
+
+
+
+Model1_res = resid(Model1_fit)
+
+plot(trainingdata$Age, Model1_res, ylab="Residuals", xlab="Age", main="Age Residuals Plot", col="blue") 
+abline(0, 0)                  # the horizontal line
+
+
+## Predicting Attrition - CREATE THE TARGET OBJECTS
+dfTrainData <- data.frame(trainingdata[1:1170,c(1,2,7,15,20,27,29,30,32,33,35,36,39,38)])
+train_target <- as.factor(trainingdata[1:1170, 3])     ## target must be saved as a factor for knn function
+length(train_target)
+
+dfTestData <- data.frame(testdata[1:300,c(1,2,7,15,20,27,29,30,32,33,35,36,39,38)])
+test_target <- as.factor(testdata[1:300, 3])           ## target must be saved as a factor for knn function
+length(test_target)
+
+## build classification Models and confusion tables
+dfTrainM1 <- knn(train=dfTrainData, test=dfTestData, cl=train_target, k=11)
+## Comparisons models only
+dfTrainM2 <- knn(train=dfTrainData, test=dfTestData, cl=train_target, k=5)
+dfTrainM3 <- knn(train=dfTrainData, test=dfTestData, cl=train_target, k=8)
+dfTrainM4 <- knn(train=dfTrainData, test=dfTestData, cl=train_target, k=9)
+dfTrainM5 <- knn(train=dfTrainData, test=dfTestData, cl=train_target, k=10)
+## Confusion Tables
+table(test_target, dfTrainM1)
+confusionMatrix(dfTrainM1, test_target)
+table(test_target, dfTrainM2)
+confusionMatrix(dfTrainM2, test_target)
+## comparison purpose only
+table(test_target, dfTrainM2)
+table(test_target, dfTrainM3)
+table(test_target, dfTrainM4)
+table(test_target, dfTrainM5)
+
+
+## creation of dfTrain and dfVal data frame
+###IMPORTANT NOTE ----I was not able to get rid of the NA so I had to use a reduced file####
+dfTrain <- data.frame(trainingdata[1:1170,c(1,2,7,15,20,27,29,30,32,33,35,36,39,38)])
+train_target <- as.factor(trainingdata[1:1170, 3])     ## target must be saved as a factor for knn function
+length(train_target)
+
+dfVal <- data.frame(testdata[1:300,c(1,2,7,15,20,27,29,30,32,33,35,36,39,38)])
+test_target <- as.factor(testdata[1:300, 3])           ## target must be saved as a factor for knn function
+length(test_target)
+
+dfPreds1 <- knn(train=dfTrain, test=dfVal, cl=train_target, k=11)
+dfPreds1
+confusionMatrix(dfPreds1, test_target)
+
+dfPreds <- data.frame(testdata$ID,dfPreds1)
+
+write.csv(dfPreds, file="Case2PredictionsGarciadeAlford.csv")
+
+
+
+
+```
+
+
+
+
